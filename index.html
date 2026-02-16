@@ -383,6 +383,7 @@
             
             // Optimized audio processing (no artificial delay)
             (async () => {
+                let result = null;
                 try {
                     // Quick audio analysis (optimized)
                     const startTime = performance.now();
@@ -395,7 +396,7 @@
                     const features = extractOptimizedFeatures(audioBuffer);
                     
                     // Fast classification
-                    const result = classifyAudioOptimized(features);
+                    result = classifyAudioOptimized(features);
                     
                     // Update result with real classification
                     document.getElementById('prediction').textContent = result.class;
@@ -412,8 +413,19 @@
                     const probabilities = [0.15, 0.65, 0.12, 0.08];
                     const maxIndex = probabilities.indexOf(Math.max(...probabilities));
                     
-                    document.getElementById('prediction').textContent = classes[maxIndex];
-                    document.getElementById('confidence').textContent = `Confidence: ${(probabilities[maxIndex] * 100).toFixed(1)}%`;
+                    result = {
+                        class: classes[maxIndex],
+                        confidence: probabilities[maxIndex],
+                        allScores: {
+                            'Apraxia': probabilities[0],
+                            'Dysarthria': probabilities[1],
+                            'Dysphonia': probabilities[2],
+                            'Healthy': probabilities[3]
+                        }
+                    };
+                    
+                    document.getElementById('prediction').textContent = result.class;
+                    document.getElementById('confidence').textContent = `Confidence: ${(result.confidence * 100).toFixed(1)}%`;
                 }
                 
                 // Show results
