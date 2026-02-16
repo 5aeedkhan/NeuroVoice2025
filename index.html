@@ -381,23 +381,29 @@
             processBtn.innerHTML = '<div class="loading-spinner inline-block mr-2"></div>Processing...';
             processBtn.disabled = true;
             
-            // Simulate processing delay
-            // Real audio processing
-            setTimeout(async () => {
+            // Optimized audio processing (no artificial delay)
+            (async () => {
                 try {
+                    // Quick audio analysis (optimized)
+                    const startTime = performance.now();
+                    
                     // Create audio context and analyze real audio
                     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     const audioBuffer = await audioContext.decodeAudioData(await uploadedAudio.arrayBuffer());
                     
-                    // Extract real audio features
-                    const features = extractAudioFeatures(audioBuffer);
+                    // Extract optimized features (much faster)
+                    const features = extractOptimizedFeatures(audioBuffer);
                     
-                    // Real classification based on extracted features
-                    const result = classifyAudio(features);
+                    // Fast classification
+                    const result = classifyAudioOptimized(features);
                     
                     // Update result with real classification
                     document.getElementById('prediction').textContent = result.class;
                     document.getElementById('confidence').textContent = `Confidence: ${(result.confidence * 100).toFixed(1)}%`;
+                    
+                    // Show processing time
+                    const processingTime = (performance.now() - startTime).toFixed(0);
+                    console.log(`Processing time: ${processingTime}ms`);
                     
                 } catch (error) {
                     console.error('Audio processing error:', error);
@@ -424,7 +430,7 @@
                 // Reset button
                 processBtn.innerHTML = '<i class="fas fa-brain mr-2"></i>Classify Speech Disorder';
                 processBtn.disabled = false;
-            }, 2000);
+            })();
         }
 
         // Create confidence chart
@@ -630,60 +636,60 @@
             });
         }
 
-        // Real audio feature extraction
-        function extractAudioFeatures(audioBuffer) {
+        // Optimized feature extraction (much faster)
+        function extractOptimizedFeatures(audioBuffer) {
             const channelData = audioBuffer.getChannelData(0);
             const sampleRate = audioBuffer.sampleRate;
             const duration = audioBuffer.duration;
             
-            // Basic audio statistics
-            const rms = Math.sqrt(channelData.reduce((sum, val) => sum + val * val, 0) / channelData.length);
-            const zeroCrossings = channelData.reduce((count, val, i) => i > 0 && (val * channelData[i-1] < 0) ? count + 1 : count, 0);
-            const zcr = zeroCrossings / channelData.length;
+            // Sample the data for faster processing
+            const sampleSize = Math.min(channelData.length, 44100); // Max 1 second of data
+            const step = Math.floor(channelData.length / sampleSize);
+            const sampledData = [];
             
-            // Calculate spectral features
-            const fftSize = 2048;
-            const spectrogram = [];
-            const hopSize = 512;
-            
-            for (let i = 0; i < channelData.length - fftSize; i += hopSize) {
-                const frame = channelData.slice(i, i + fftSize);
-                const spectrum = computeFFT(frame);
-                spectrogram.push(spectrum);
+            for (let i = 0; i < channelData.length; i += step) {
+                sampledData.push(channelData[i]);
             }
             
-            // Extract MFCC-like features
-            const mfccFeatures = extractMFCCFeatures(spectrogram, sampleRate);
+            // Quick basic statistics
+            const rms = Math.sqrt(sampledData.reduce((sum, val) => sum + val * val, 0) / sampledData.length);
+            const zeroCrossings = sampledData.reduce((count, val, i) => i > 0 && (val * sampledData[i-1] < 0) ? count + 1 : count, 0);
+            const zcr = zeroCrossings / sampledData.length;
             
-            // Spectral features
-            const spectralCentroid = calculateSpectralCentroid(spectrogram, sampleRate);
-            const spectralRolloff = calculateSpectralRolloff(spectrogram, sampleRate);
-            const spectralContrast = calculateSpectralContrast(spectrogram);
+            // Quick spectral analysis (simplified)
+            const spectrum = computeFastFFT(sampledData);
+            const spectralCentroid = computeSpectralCentroid(spectrum, sampleRate);
+            const spectralRolloff = computeSpectralRolloff(spectrum, sampleRate);
             
             return {
                 duration,
                 rms,
                 zcr,
-                mfcc: mfccFeatures,
                 spectralCentroid,
                 spectralRolloff,
-                spectralContrast
+                // Add simplified MFCC-like features
+                spectralEnergy: spectrum.reduce((sum, val) => sum + val, 0),
+                spectralSpread: computeSpectralSpread(spectrum, sampleRate)
             };
         }
 
-        // FFT computation
-        function computeFFT(signal) {
+        // Fast FFT (optimized)
+        function computeFastFFT(signal) {
             const N = signal.length;
-            const spectrum = new Array(N / 2);
+            const spectrum = new Array(Math.floor(N / 2));
             
-            for (let k = 0; k < N / 2; k++) {
+            // Use only first 1024 samples for speed
+            const fftSize = Math.min(N, 1024);
+            const signalSlice = signal.slice(0, fftSize);
+            
+            for (let k = 0; k < Math.floor(fftSize / 2); k++) {
                 let real = 0;
                 let imag = 0;
                 
-                for (let n = 0; n < N; n++) {
-                    const angle = -2 * Math.PI * k * n / N;
-                    real += signal[n] * Math.cos(angle);
-                    imag += signal[n] * Math.sin(angle);
+                for (let n = 0; n < fftSize; n++) {
+                    const angle = -2 * Math.PI * k * n / fftSize;
+                    real += signalSlice[n] * Math.cos(angle);
+                    imag += signalSlice[n] * Math.sin(angle);
                 }
                 
                 spectrum[k] = Math.sqrt(real * real + imag * imag);
@@ -692,140 +698,57 @@
             return spectrum;
         }
 
-        // MFCC-like feature extraction
-        function extractMFCCFeatures(spectrogram, sampleRate) {
-            const numCoeffs = 13;
-            const mfccs = [];
+        // Fast spectral centroid
+        function computeSpectralCentroid(spectrum, sampleRate) {
+            let numerator = 0;
+            let denominator = 0;
             
-            spectrogram.forEach(frame => {
-                const melSpectrum = applyMelFilterBank(frame, sampleRate);
-                const logMelSpectrum = melSpectrum.map(val => Math.log(val + 1e-10));
-                const mfcc = applyDCT(logMelSpectrum).slice(0, numCoeffs);
-                mfccs.push(mfcc);
+            spectrum.forEach((magnitude, i) => {
+                const frequency = i * sampleRate / (2 * spectrum.length);
+                numerator += magnitude * frequency;
+                denominator += magnitude;
             });
             
-            // Average across time
-            const avgMfcc = new Array(numCoeffs).fill(0);
-            mfccs.forEach(mfcc => {
-                mfcc.forEach((coeff, i) => {
-                    avgMfcc[i] += coeff;
-                });
-            });
-            
-            return avgMfcc.map(val => val / mfccs.length);
+            return denominator > 0 ? numerator / denominator : 0;
         }
 
-        // Mel filter bank
-        function applyMelFilterBank(spectrum, sampleRate) {
-            const numFilters = 26;
-            const melSpectrum = new Array(numFilters).fill(0);
+        // Fast spectral rolloff
+        function computeSpectralRolloff(spectrum, sampleRate) {
+            const totalEnergy = spectrum.reduce((sum, val) => sum + val, 0);
+            const thresholdEnergy = totalEnergy * 0.85;
             
-            // Simplified mel filter bank
-            for (let i = 0; i < numFilters; i++) {
-                const startFreq = (i / numFilters) * (sampleRate / 2);
-                const endFreq = ((i + 1) / numFilters) * (sampleRate / 2);
-                const startBin = Math.floor(startFreq * spectrum.length / (sampleRate / 2));
-                const endBin = Math.floor(endFreq * spectrum.length / (sampleRate / 2));
-                
-                for (let j = startBin; j < endBin && j < spectrum.length; j++) {
-                    melSpectrum[i] += spectrum[j];
+            let cumulativeEnergy = 0;
+            for (let i = 0; i < spectrum.length; i++) {
+                cumulativeEnergy += spectrum[i];
+                if (cumulativeEnergy >= thresholdEnergy) {
+                    return i * sampleRate / (2 * spectrum.length);
                 }
             }
             
-            return melSpectrum;
+            return sampleRate / 2;
         }
 
-        // DCT (Discrete Cosine Transform)
-        function applyDCT(signal) {
-            const N = signal.length;
-            const dct = new Array(N);
+        // Fast spectral spread
+        function computeSpectralSpread(spectrum, sampleRate) {
+            const centroid = computeSpectralCentroid(spectrum, sampleRate);
+            let numerator = 0;
+            let denominator = 0;
             
-            for (let k = 0; k < N; k++) {
-                let sum = 0;
-                for (let n = 0; n < N; n++) {
-                    sum += signal[n] * Math.cos(Math.PI * k * (n + 0.5) / N);
-                }
-                dct[k] = sum * Math.sqrt(2 / N);
-            }
-            
-            return dct;
-        }
-
-        // Spectral centroid
-        function calculateSpectralCentroid(spectrogram, sampleRate) {
-            const centroids = [];
-            
-            spectrogram.forEach(frame => {
-                let numerator = 0;
-                let denominator = 0;
-                
-                frame.forEach((magnitude, i) => {
-                    const frequency = i * sampleRate / (2 * frame.length);
-                    numerator += magnitude * frequency;
-                    denominator += magnitude;
-                });
-                
-                centroids.push(denominator > 0 ? numerator / denominator : 0);
+            spectrum.forEach((magnitude, i) => {
+                const frequency = i * sampleRate / (2 * spectrum.length);
+                const diff = frequency - centroid;
+                numerator += magnitude * diff * diff;
+                denominator += magnitude;
             });
             
-            return centroids.reduce((sum, val) => sum + val, 0) / centroids.length;
+            return denominator > 0 ? Math.sqrt(numerator / denominator) : 0;
         }
 
-        // Spectral rolloff
-        function calculateSpectralRolloff(spectrogram, sampleRate) {
-            const rolloffs = [];
-            const threshold = 0.85;
+        // Optimized classification
+        function classifyAudioOptimized(features) {
+            const { duration, rms, zcr, spectralCentroid, spectralRolloff, spectralEnergy, spectralSpread } = features;
             
-            spectrogram.forEach(frame => {
-                const totalEnergy = frame.reduce((sum, val) => sum + val, 0);
-                const thresholdEnergy = totalEnergy * threshold;
-                
-                let cumulativeEnergy = 0;
-                let rolloffBin = 0;
-                
-                for (let i = 0; i < frame.length; i++) {
-                    cumulativeEnergy += frame[i];
-                    if (cumulativeEnergy >= thresholdEnergy) {
-                        rolloffBin = i;
-                        break;
-                    }
-                }
-                
-                rolloffs.push(rolloffBin * sampleRate / (2 * frame.length));
-            });
-            
-            return rolloffs.reduce((sum, val) => sum + val, 0) / rolloffs.length;
-        }
-
-        // Spectral contrast
-        function calculateSpectralContrast(spectrogram) {
-            const contrasts = [];
-            const numBands = 6;
-            
-            spectrogram.forEach(frame => {
-                const bandSize = Math.floor(frame.length / numBands);
-                const bandEnergies = [];
-                
-                for (let i = 0; i < numBands; i++) {
-                    const startBin = i * bandSize;
-                    const endBin = Math.min((i + 1) * bandSize, frame.length);
-                    const bandEnergy = frame.slice(startBin, endBin).reduce((sum, val) => sum + val, 0);
-                    bandEnergies.push(bandEnergy);
-                }
-                
-                const maxEnergy = Math.max(...bandEnergies);
-                const minEnergy = Math.min(...bandEnergies);
-                contrasts.push(maxEnergy > 0 ? (maxEnergy - minEnergy) / maxEnergy : 0);
-            });
-            
-            return contrasts.reduce((sum, val) => sum + val, 0) / contrasts.length;
-        }
-
-        // Real classification based on extracted features
-        function classifyAudio(features) {
-            const { duration, rms, zcr, mfcc, spectralCentroid, spectralRolloff, spectralContrast } = features;
-            
-            // Classification logic based on real audio features
+            // Fast classification logic
             let scores = {
                 'Healthy': 0.25,
                 'Dysarthria': 0.25,
@@ -833,49 +756,41 @@
                 'Dysphonia': 0.25
             };
             
-            // Duration-based scoring
+            // Quick duration-based scoring
             if (duration < 2) {
-                scores['Healthy'] += 0.3;
+                scores['Healthy'] += 0.4;
             } else if (duration > 4) {
-                scores['Dysarthria'] += 0.2;
-                scores['Apraxia'] += 0.1;
-            }
-            
-            // RMS energy-based scoring
-            if (rms < 0.05) {
-                scores['Dysphonia'] += 0.3;
-            } else if (rms > 0.2) {
+                scores['Dysarthria'] += 0.3;
                 scores['Apraxia'] += 0.2;
-            } else {
-                scores['Healthy'] += 0.2;
             }
             
-            // Zero crossing rate scoring
+            // Quick energy-based scoring
+            if (rms < 0.05) {
+                scores['Dysphonia'] += 0.4;
+            } else if (rms > 0.2) {
+                scores['Apraxia'] += 0.3;
+            } else {
+                scores['Healthy'] += 0.3;
+            }
+            
+            // Quick ZCR scoring
             if (zcr > 0.15) {
                 scores['Dysarthria'] += 0.3;
             } else if (zcr < 0.05) {
                 scores['Dysphonia'] += 0.2;
             } else {
-                scores['Healthy'] += 0.1;
+                scores['Healthy'] += 0.2;
             }
             
-            // Spectral features scoring
+            // Quick spectral scoring
             if (spectralCentroid > 2000) {
                 scores['Apraxia'] += 0.2;
             } else if (spectralCentroid < 1000) {
                 scores['Dysphonia'] += 0.2;
             }
             
-            if (spectralContrast > 0.7) {
+            if (spectralSpread > 1000) {
                 scores['Dysarthria'] += 0.2;
-            }
-            
-            // MFCC-based scoring (simplified)
-            const mfccMean = mfcc.reduce((sum, val) => sum + val, 0) / mfcc.length;
-            if (mfccMean > 0) {
-                scores['Apraxia'] += 0.1;
-            } else {
-                scores['Healthy'] += 0.1;
             }
             
             // Normalize scores
@@ -884,7 +799,7 @@
                 scores[key] /= totalScore;
             });
             
-            // Find the best class
+            // Find best class
             const bestClass = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
             const confidence = scores[bestClass];
             
